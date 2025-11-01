@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keystroke Enrollment - MFA System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <h1>⌨️ Keystroke Enrollment</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/profile">Back</a>
+                <a href="#" onclick="logout()">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="enrollment-container">
+            <div id="alertBox" class="alert-box"></div>
+
+            <div class="enrollment-card">
+                <h2>Keystroke Dynamics Enrollment</h2>
+                <p>Type the following text as naturally as possible. You need to complete 5 samples.</p>
+
+                <div class="reference-text">
+                    <h3>Reference Text:</h3>
+                    <p class="text-to-type">the quick brown fox jumps over the lazy dog</p>
+                </div>
+
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <p id="progressText">Sample 0/5</p>
+
+                <div class="keystroke-input-area">
+                    <input type="text" id="keystrokeInput" placeholder="Click here and type the reference text..." class="keystroke-input">
+                </div>
+
+                <div class="keystroke-stats">
+                    <p>Dwell Time: <span id="dwellTime">0</span> ms</p>
+                    <p>Flight Time: <span id="flightTime">0</span> ms</p>
+                    <p>Typing Speed: <span id="typingSpeed">0</span> WPM</p>
+                </div>
+
+                <div class="button-group">
+                    <button id="submitBtn" onclick="submitKeystrokeSample()" class="btn btn-primary" disabled>
+                        Submit Sample
+                    </button>
+                    <button id="completeBtn" onclick="completeEnrollment()" class="btn btn-success" disabled style="display: none;">
+                        ✓ Complete Enrollment
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/keystroke-capture.js') }}"></script>
+    <script>
+        let keystrokeData = null;
+        let sampleCount = 0;
+        const token = localStorage.getItem('access_token') || localStorage.getItem('temp_token');
+
+        const keystrokeInput = document.getElementById('keystrokeInput');
+
+        keystrokeInput.addEventListener('keydown', (e) => {
+            if (!keystrokeData) {
+                keystrokeData = {
+                    timestamps: [],
+                    keys: [],
+                    events: []
+                };
+            }
+
+            keystrokeData.timestamps.push(performance.now());
+            keystrokeData.keys.push(e.key);
+            keystrokeData.events.push('keydown');
+
+            document.getElementById('submitBtn').disabled = false;
+        });
+
+        keystrokeInput.addEventListener('keyup', (e) => {
+            if (!keystrokeData) return;
+
+            keystrokeData.timestamps.push(performance.now());
+            keystrokeData.keys.push(e.key);
+            keystrokeData.events.push('keyup');
+        });
+
+        async function submitKeystrokeSample() {
+            if (!keystrokeData || keystrokeData.timestamps.length < 10) {
+                showAlert('Please type something first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/keystroke/enroll', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        keystroke_data: keystrokeData
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    sampleCount = data.samples_collected;
+                    document.getElementById('progressText').textContent = `Sample ${sampleCount}/5`;
+                    document.getElementById('progressFill').style.width = `${(sampleCount / 5) * 100}%`;
+                    
+                    keystrokeInput.value = '';
+                    keystrokeData = null;
+                    document.getElementById('submitBtn').disabled = true;
+
+                    showAlert(`✓ Sample ${sampleCount} recorded`, 'success');
+
+                    if (data.ready) {
+                        document.getElementById('submitBtn').style.display = 'none';
+                        document.getElementById('completeBtn').style.display = 'block';
+                    }
+                } else {
+                    showAlert(data.error || 'Failed to record sample', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function completeEnrollment() {
+            showAlert('✓ Keystroke enrollment complete! Redirecting...', 'success');
+            setTimeout(() => {
+                window.location.href = '/profile';
+            }, 1500);
+        }
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.className = `alert-box alert-${type}`;
+            alertBox.textContent = message;
+            alertBox.style.display = 'block';
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/login';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - MFA System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <h1>🔐 Profile</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/dashboard">Dashboard</a>
+                <a href="#" onclick="logout()">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="profile-container">
+            <div id="alertBox" class="alert-box"></div>
+
+            <div class="profile-grid">
+                <div class="profile-card">
+                    <h2>📋 User Information</h2>
+                    <form id="profileForm">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Update Profile</button>
+                    </form>
+                </div>
+
+                <div class="profile-card">
+                    <h2>⌨️ Keystroke Dynamics</h2>
+                    <div id="keystrokeCard">
+                        <p>Status: <strong id="keystrokeStatus">Not Enrolled</strong></p>
+                        <p>Samples: <strong id="keystrokeSamples">0/5</strong></p>
+                        <p>Threshold: <strong id="keystrokeThreshold">0.70</strong></p>
+                        <button onclick="window.location.href='/keystroke_enroll'" class="btn btn-secondary">
+                            Enroll
+                        </button>
+                    </div>
+                </div>
+
+                <div class="profile-card">
+                    <h2>👤 Face Recognition</h2>
+                    <div id="faceCard">
+                        <p>Status: <strong id="faceStatus">Not Enrolled</strong></p>
+                        <p>Samples: <strong id="faceSamples">0/3</strong></p>
+                        <p>Threshold: <strong id="faceThreshold">0.60</strong></p>
+                        <button onclick="window.location.href='/face_enroll'" class="btn btn-secondary">
+                            Enroll
+                        </button>
+                    </div>
+                </div>
+
+                <div class="profile-card">
+                    <h2>🔐 MFA Settings</h2>
+                    <div class="mfa-settings">
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="keystrokeToggle">
+                                Enable Keystroke Authentication
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="faceToggle">
+                                Enable Face Recognition
+                            </label>
+                        </div>
+                        <button onclick="saveMFASettings()" class="btn btn-primary">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        async function loadProfile() {
+            try {
+                const token = localStorage.getItem('access_token') || localStorage.getItem('temp_token');
+                
+                const response = await fetch('/api/user/profile', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    const user = response.json();
+                    await user.then(data => {
+                        document.getElementById('username').value = data.username;
+                        document.getElementById('email').value = data.email;
+                        
+                        // Keystroke status
+                        document.getElementById('keystrokeStatus').textContent = data.keystroke_enabled ? '✓ Enrolled' : '✗ Not Enrolled';
+                        document.getElementById('keystrokeSamples').textContent = `${data.keystroke_samples}/5`;
+                        document.getElementById('keystrokeThreshold').textContent = data.keystroke_threshold.toFixed(2);
+                        document.getElementById('keystrokeToggle').checked = data.keystroke_enabled;
+                        
+                        // Face status
+                        document.getElementById('faceStatus').textContent = data.face_enabled ? '✓ Enrolled' : '✗ Not Enrolled';
+                        document.getElementById('faceSamples').textContent = `${data.face_samples}/3`;
+                        document.getElementById('faceThreshold').textContent = data.face_threshold.toFixed(2);
+                        document.getElementById('faceToggle').checked = data.face_enabled;
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                showAlert('Error loading profile', 'error');
+            }
+        }
+
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+                const token = localStorage.getItem('access_token') || localStorage.getItem('temp_token');
+                
+                const response = await fetch('/api/user/update-profile', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        email: document.getElementById('email').value
+                    })
+                });
+
+                if (response.ok) {
+                    showAlert('✓ Profile updated successfully', 'success');
+                } else {
+                    const data = await response.json();
+                    showAlert(data.error || 'Update failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        });
+
+        async function saveMFASettings() {
+            try {
+                const token = localStorage.getItem('access_token') || localStorage.getItem('temp_token');
+                
+                // Enable/disable keystroke
+                await fetch('/api/user/enable-mfa', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        method: 'keystroke',
+                        enabled: document.getElementById('keystrokeToggle').checked
+                    })
+                });
+
+                // Enable/disable face
+                await fetch('/api/user/enable-mfa', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        method: 'face',
+                        enabled: document.getElementById('faceToggle').checked
+                    })
+                });
+
+                showAlert('✓ MFA settings saved', 'success');
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.className = `alert-box alert-${type}`;
+            alertBox.textContent = message;
+            alertBox.style.display = 'block';
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/login';
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>

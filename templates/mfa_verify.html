@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MFA Verification - MFA System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <h1>🔐 MFA Verification</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/login">Back</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="verify-container">
+            <div id="alertBox" class="alert-box"></div>
+
+            <div class="verify-card">
+                <h2>Multi-Factor Authentication Verification</h2>
+                <p>Verifying your identity...</p>
+
+                <div class="verification-progress">
+                    <div class="verification-step">
+                        <span id="keystrokeCheck" class="status">⏳</span>
+                        <p>Keystroke Verification</p>
+                    </div>
+                    <div class="verification-step">
+                        <span id="faceCheck" class="status">⏳</span>
+                        <p>Face Verification</p>
+                    </div>
+                    <div class="verification-step">
+                        <span id="combinedCheck" class="status">⏳</span>
+                        <p>Combined Decision</p>
+                    </div>
+                </div>
+
+                <div class="results-box" id="resultsBox" style="display: none;">
+                    <h3>Authentication Results</h3>
+                    <div class="results-content">
+                        <p>Keystroke Score: <strong id="keystrokeScore">0%</strong></p>
+                        <p>Face Score: <strong id="faceScore">0%</strong></p>
+                        <p>Combined Score: <strong id="combinedScore">0%</strong></p>
+                        <p style="font-size: 1.2em; margin-top: 1em;">
+                            Status: <strong id="status" style="color: red;">Verifying...</strong>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="completeBtn" onclick="completeAuth()" class="btn btn-primary" disabled style="display: none;">
+                        Complete Authentication
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        const token = localStorage.getItem('temp_token');
+        
+        async function verifyMFA() {
+            try {
+                const keystrokePassed = localStorage.getItem('keystroke_passed') === 'true';
+                const keystrokeScore = parseFloat(localStorage.getItem('keystroke_score')) || 0;
+                const facePassed = localStorage.getItem('face_passed') === 'true';
+                const faceScore = parseFloat(localStorage.getItem('face_score')) || 0;
+
+                // Display individual results
+                document.getElementById('keystrokeCheck').textContent = keystrokePassed ? '✓' : '✗';
+                document.getElementById('keystrokeCheck').style.color = keystrokePassed ? 'green' : 'red';
+                document.getElementById('keystrokeScore').textContent = (keystrokeScore * 100).toFixed(1) + '%';
+
+                document.getElementById('faceCheck').textContent = facePassed ? '✓' : '✗';
+                document.getElementById('faceCheck').style.color = facePassed ? 'green' : 'red';
+                document.getElementById('faceScore').textContent = (faceScore * 100).toFixed(1) + '%';
+
+                // Verify MFA
+                const response = await fetch('/api/mfa/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        keystroke_score: keystrokeScore,
+                        keystroke_passed: keystrokePassed,
+                        face_score: faceScore,
+                        face_passed: facePassed
+                    })
+                });
+
+                const data = await response.json();
+
+                // Show results
+                document.getElementById('resultsBox').style.display = 'block';
+                document.getElementById('combinedScore').textContent = (data.combined_score * 100).toFixed(1) + '%';
+
+                if (data.success) {
+                    document.getElementById('combinedCheck').textContent = '✓';
+                    document.getElementById('combinedCheck').style.color = 'green';
+                    document.getElementById('status').textContent = '✓ AUTHENTICATED';
+                    document.getElementById('status').style.color = 'green';
+
+                    // Store access token
+                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.removeItem('temp_token');
+                    localStorage.removeItem('keystroke_passed');
+                    localStorage.removeItem('keystroke_score');
+                    localStorage.removeItem('face_passed');
+                    localStorage.removeItem('face_score');
+
+                    showAlert('✓ Authentication successful! Redirecting...', 'success');
+                    
+                    document.getElementById('completeBtn').style.display = 'block';
+                    document.getElementById('completeBtn').disabled = false;
+
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 2000);
+                } else {
+                    document.getElementById('combinedCheck').textContent = '✗';
+                    document.getElementById('combinedCheck').style.color = 'red';
+                    document.getElementById('status').textContent = '✗ AUTHENTICATION FAILED';
+                    document.getElementById('status').style.color = 'red';
+
+                    showAlert('✗ Authentication failed. Please try again.', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        function completeAuth() {
+            window.location.href = '/dashboard';
+        }
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.className = `alert-box alert-${type}`;
+            alertBox.textContent = message;
+            alertBox.style.display = 'block';
+        }
+
+        // Start verification on load
+        verifyMFA();
+    </script>
+</body>
+</html>

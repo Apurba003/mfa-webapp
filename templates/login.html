@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - MFA System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <h1>🔐 Login</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/register">Register</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="form-container">
+            <h1>Login to Your Account</h1>
+            
+            <div id="alertBox" class="alert-box"></div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required placeholder="Enter your username">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">Login</button>
+            </form>
+
+            <div class="form-footer">
+                <p>Don't have an account? <a href="/register">Register here</a></p>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Store temporary token
+                    localStorage.setItem('temp_token', data.temp_token);
+                    localStorage.setItem('user_data', JSON.stringify(data.user));
+
+                    if (data.mfa_enabled) {
+                        showAlert('✓ Password verified! Proceed to MFA...', 'success');
+                        setTimeout(() => {
+                            // Redirect to keystroke auth if enabled
+                            if (data.keystroke_enabled) {
+                                window.location.href = '/keystroke_auth';
+                            } else if (data.face_enabled) {
+                                window.location.href = '/face_auth';
+                            }
+                        }, 1000);
+                    } else {
+                        showAlert('✓ Login successful! Please enroll biometrics first.', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/profile';
+                        }, 1500);
+                    }
+                } else {
+                    showAlert(data.error || 'Login failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        });
+
+        function showAlert(message, type) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.className = `alert-box alert-${type}`;
+            alertBox.textContent = message;
+            alertBox.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
