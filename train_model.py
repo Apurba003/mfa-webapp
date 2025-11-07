@@ -1,131 +1,173 @@
-import os
-import joblib
-from datetime import datetime
-import numpy as np
 import pandas as pd
+import numpy as np
+from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import OneClassSVM
+import pickle
+import os
 
-# ========== CONFIG ==========
-MODEL_KEY = "my_user"   # change to your user id
-SAMPLE_FILES = [
-    "data/sample1.csv",
-    "data/sample2.csv",
-    "data/sample3.csv",
-    "data/sample4.csv",
-    "data/sample5.csv",
-    # add more samples...
-]
-MODEL_DIR = "Model"
-MAX_POS = 30            # number of dwell & flight positions to keep (pad/truncate)
-NU = 0.9                # One-Class SVM nu parameter
-THRESHOLD_PERCENTILE = 50.0   # percentile on training scores used as acceptance threshold
-# ===========================
-
-os.makedirs(MODEL_DIR, exist_ok=True)
-
-
-def build_position_feature(dwell, flight, max_pos=30):
-    """Return fixed-length position-wise feature vector from dwell & flight arrays."""
-    # dwell -> length max_pos (pad with -1)
-    d = np.array(dwell) if dwell is not None else np.array([])
-    f = np.array(flight) if flight is not None else np.array([])
-
-    d_p = np.full(max_pos, -1.0, dtype=float)
-    f_p = np.full(max_pos, -1.0, dtype=float)
-
-    if d.size > 0:
-        d_p[: min(max_pos, d.size)] = d[:max_pos]
-    if f.size > 0:
-        # flight usually length = n_keys - 1; store in first positions
-        f_p[: min(max_pos, f.size)] = f[:max_pos]
-
-    # also append summary stats for robustness
-    mean_d = float(np.mean(d)) if d.size > 0 else -1.0
-    std_d = float(np.std(d)) if d.size > 0 else 0.0
-    mean_f = float(np.mean(f)) if f.size > 0 else -1.0
-    std_f = float(np.std(f)) if f.size > 0 else 0.0
-    n_keys = float(d.size)
-    meta = np.array([mean_d, std_d, mean_f, std_f, n_keys], dtype=float)
-
-    return np.concatenate([d_p, f_p, meta])
-
-
-def sample_to_feature(path, max_pos=30):
-    """Read single-sample CSV (event rows) and return position-wise feature vector."""
-    df = pd.read_csv(path)
-    # prefer dwell_time and flight_time columns if present
-    if 'dwell_time' in df.columns:
-        dwell = df['dwell_time'].to_numpy()
-    elif {'press_time', 'release_time'}.issubset(df.columns):
-        dwell = (df['release_time'] - df['press_time']).to_numpy()
-    else:
-        dwell = np.array([])
-
-    if 'flight_time' in df.columns:
-        flight = df['flight_time'].to_numpy()
-        # drop trailing NaN if present
-        if flight.size > 0 and np.isnan(flight[-1]):
-            flight = flight[~np.isnan(flight)]
-    elif {'press_time', 'release_time'}.issubset(df.columns):
-        rel = df['release_time'].to_numpy()
-        press = df['press_time'].to_numpy()
-        flight = press[1:] - rel[:-1] if rel.size > 1 else np.array([])
-    else:
-        flight = np.array([])
-
-    # remove NaNs if any
-    if dwell.size > 0:
-        dwell = dwell[~np.isnan(dwell)]
-    if flight.size > 0:
-        flight = flight[~np.isnan(flight)]
-
-    return build_position_feature(dwell, flight, max_pos=max_pos)
-
-
-# Collect features
-features = []
-for p in SAMPLE_FILES:
-    if not os.path.exists(p):
-        print(f"Warning: file not found, skipping: {p}")
-        continue
-    try:
-        feat = sample_to_feature(p, max_pos=MAX_POS)
-        features.append(feat)
-        print(f"Loaded {p} -> feature_len={len(feat)}")
-    except Exception as e:
-        print(f"Error reading {p}: {e}")
-
-if len(features) < 5:
-    raise ValueError(f"Need >=5 samples for stable per-user model; found {len(features)}")
-
-X = np.vstack(features)
-print(f"Training on {X.shape[0]} samples, feature dim = {X.shape[1]}")
-
-# scale, train
-scaler = StandardScaler().fit(X)
-Xs = scaler.transform(X)
-
-svm = OneClassSVM(kernel='rbf', gamma='scale', nu=NU).fit(Xs)
-
-scores = svm.decision_function(Xs)
-threshold = float(np.percentile(scores, THRESHOLD_PERCENTILE))
-
-model_obj = {
-    'scaler': scaler,
-    'model': svm,
-    'threshold': threshold,
-    'meta': {
-        'user': MODEL_KEY,
-        'n_samples': int(X.shape[0]),
-        'max_pos': int(MAX_POS),
-        'nu': float(NU),
-        'threshold_percentile': float(THRESHOLD_PERCENTILE),
-        'created_at': datetime.utcnow().isoformat() + "Z"
+def extract_features_from_attempt(df):
+    """Extract features from a single password attempt"""
+    dwell = df['dwell_time'].dropna()
+    flight = df['flight_time'].dropna()
+    
+    features = {
+        'dwell_mean': dwell.mean(),
+        'dwell_std': dwell.std(),
+        'dwell_median': dwell.median(),
+        'dwell_min': dwell.min(),
+        'dwell_max': dwell.max(),
+        'dwell_q25': dwell.quantile(0.25),
+        'dwell_q75': dwell.quantile(0.75),
+        'flight_mean': flight.mean(),
+        'flight_std': flight.std(),
+        'flight_median': flight.median(),
+        'flight_min': flight.min(),
+        'flight_max': flight.max(),
+        'flight_q25': flight.quantile(0.25),
+        'flight_q75': flight.quantile(0.75),
     }
+    
+    return features
+
+# Load all 5 CSV files
+print("Loading training data from 5 CSV files...")
+print("="*50)
+
+csv_files = ['data/sample1.csv', 'data/sample2.csv', 'data/sample3.csv', 'data/sample4.csv', 'data/sample5.csv']
+attempts = []
+features_list = []
+
+for i, csv_file in enumerate(csv_files, 1):
+    if not os.path.exists(csv_file):
+        print(f"✗ ERROR: {csv_file} not found!")
+        print(f"Please make sure all 5 files exist:")
+        for f in csv_files:
+            print(f"  - {f}")
+        exit(1)
+    
+    # Load CSV
+    df = pd.read_csv(csv_file)
+    df.columns = df.columns.str.strip().str.lower()
+    
+    attempts.append(df)
+    print(f"✓ Loaded {csv_file}: {len(df)} keystrokes")
+    
+    # Extract features
+    features = extract_features_from_attempt(df)
+    features_list.append(features)
+
+print("="*50)
+print(f"Total attempts loaded: {len(attempts)}")
+
+# Check if all attempts have similar length (should be same password)
+lengths = [len(att) for att in attempts]
+avg_length = np.mean(lengths)
+max_diff = max(lengths) - min(lengths)
+
+print(f"\nPassword length analysis:")
+print(f"  Lengths: {lengths}")
+print(f"  Average: {avg_length:.1f} keystrokes")
+
+if max_diff > 3:
+    print(f"  ⚠ WARNING: Length variation is {max_diff} keystrokes")
+    print(f"  This might indicate different passwords or typing errors!")
+else:
+    print(f"  ✓ Length consistency: Good (±{max_diff} keystrokes)")
+
+# Convert features to array
+X = pd.DataFrame(features_list).values
+print(f"\nGenerated {len(X)} training samples (one per CSV)")
+print(f"Features per sample: {X.shape[1]}")
+
+# Scale features
+print("\nScaling features...")
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Train Isolation Forest
+print("Training Isolation Forest model...")
+model = IsolationForest(
+    contamination=0.2,  # Expect 1 out of 5 might be slightly different
+    random_state=42,
+    n_estimators=100,
+    bootstrap=True
+)
+model.fit(X_scaled)
+
+# Save model, scaler, and metadata
+model_data = {
+    'model': model,
+    'scaler': scaler,
+    'password_length': int(avg_length),
+    'num_training_attempts': len(attempts),
+    'training_files': csv_files
 }
 
-out_path = os.path.join(MODEL_DIR, f"{MODEL_KEY}.pkl")
-joblib.dump(model_obj, out_path)
-print(f"\nModel saved -> {out_path}")
-print(f"Samples used: {X.shape[0]}, Threshold: {threshold:.6f}")
+with open('Model/password_keystroke_model.pkl', 'wb') as f:
+    pickle.dump(model_data, f)
+
+print("✓ Training completed!")
+print("✓ Model saved to 'password_keystroke_model.pkl'")
+
+# Display training summary
+print("\n" + "="*60)
+print("TRAINING SUMMARY")
+print("="*60)
+print(f"Training files used:")
+for f in csv_files:
+    print(f"  ✓ {f}")
+print(f"\nPassword attempts: {len(attempts)}")
+print(f"Average keystrokes per attempt: {avg_length:.1f}")
+print(f"Total keystrokes: {sum(lengths)}")
+print(f"Training samples: {len(X)}")
+print(f"Features per sample: {X.shape[1]}")
+print(f"Model type: Isolation Forest")
+print(f"Model file: password_keystroke_model.pkl")
+print("="*60)
+
+# Show feature statistics across all attempts
+print("\nTiming Statistics Across All 5 Attempts:")
+feature_df = pd.DataFrame(features_list)
+stats_df = feature_df[['dwell_mean', 'dwell_std', 'flight_mean', 'flight_std']].describe()
+print(stats_df.round(2))
+
+print("\n" + "="*60)
+print("Training complete! You can now verify with: python verify_password.py")
+print("="*60)
+
+"""
+HOW TO USE:
+
+1. PREPARE 5 CSV FILES:
+   Create these files with password attempts:
+   - sample1.csv
+   - sample2.csv
+   - sample3.csv
+   - sample4.csv
+   - sample5.csv
+   
+   Each CSV format:
+   key,down,up,dwell time,flight time
+   p,100,150,50,0
+   a,160,200,40,10
+   s,210,250,40,10
+   ...
+
+2. RUN TRAINING:
+   python train_password.py
+   
+3. RESULT:
+   Creates password_keystroke_model.pkl
+
+REQUIREMENTS:
+- All 5 CSV files must exist in same directory
+- Each file = 1 complete password attempt
+- Same password typed 5 times
+- Similar length across all attempts (for best results)
+
+TIPS:
+- Type naturally, not too carefully
+- Use same keyboard/device
+- Don't rush or go too slow
+- If you made errors, redo that attempt
+"""
