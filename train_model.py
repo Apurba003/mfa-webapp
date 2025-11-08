@@ -45,21 +45,21 @@ for i, csv_file in enumerate(csv_files, 1):
             print(f"  - {f}")
         exit(1)
     
-    # Load CSV
+
     df = pd.read_csv(csv_file)
     df.columns = df.columns.str.strip().str.lower()
     
     attempts.append(df)
     print(f"✓ Loaded {csv_file}: {len(df)} keystrokes")
     
-    # Extract features
+
     features = extract_features_from_attempt(df)
     features_list.append(features)
 
 print("="*50)
 print(f"Total attempts loaded: {len(attempts)}")
 
-# Check if all attempts have similar length (should be same password)
+
 lengths = [len(att) for att in attempts]
 avg_length = np.mean(lengths)
 max_diff = max(lengths) - min(lengths)
@@ -74,27 +74,27 @@ if max_diff > 3:
 else:
     print(f"  ✓ Length consistency: Good (±{max_diff} keystrokes)")
 
-# Convert features to array
+
 X = pd.DataFrame(features_list).values
 print(f"\nGenerated {len(X)} training samples (one per CSV)")
 print(f"Features per sample: {X.shape[1]}")
 
-# Scale features
+
 print("\nScaling features...")
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# Train Isolation Forest
+
 print("Training Isolation Forest model...")
 model = IsolationForest(
-    contamination=0.2,  # Expect 1 out of 5 might be slightly different
+    contamination=0.2, 
     random_state=42,
     n_estimators=100,
     bootstrap=True
 )
 model.fit(X_scaled)
 
-# Save model, scaler, and metadata
+
 model_data = {
     'model': model,
     'scaler': scaler,
@@ -109,65 +109,10 @@ with open('Model/password_keystroke_model.pkl', 'wb') as f:
 print("✓ Training completed!")
 print("✓ Model saved to 'password_keystroke_model.pkl'")
 
-# Display training summary
-print("\n" + "="*60)
-print("TRAINING SUMMARY")
-print("="*60)
-print(f"Training files used:")
-for f in csv_files:
-    print(f"  ✓ {f}")
-print(f"\nPassword attempts: {len(attempts)}")
-print(f"Average keystrokes per attempt: {avg_length:.1f}")
-print(f"Total keystrokes: {sum(lengths)}")
-print(f"Training samples: {len(X)}")
-print(f"Features per sample: {X.shape[1]}")
-print(f"Model type: Isolation Forest")
-print(f"Model file: password_keystroke_model.pkl")
-print("="*60)
 
-# Show feature statistics across all attempts
+
+
 print("\nTiming Statistics Across All 5 Attempts:")
 feature_df = pd.DataFrame(features_list)
 stats_df = feature_df[['dwell_mean', 'dwell_std', 'flight_mean', 'flight_std']].describe()
 print(stats_df.round(2))
-
-print("\n" + "="*60)
-print("Training complete! You can now verify with: python verify_password.py")
-print("="*60)
-
-"""
-HOW TO USE:
-
-1. PREPARE 5 CSV FILES:
-   Create these files with password attempts:
-   - sample1.csv
-   - sample2.csv
-   - sample3.csv
-   - sample4.csv
-   - sample5.csv
-   
-   Each CSV format:
-   key,down,up,dwell time,flight time
-   p,100,150,50,0
-   a,160,200,40,10
-   s,210,250,40,10
-   ...
-
-2. RUN TRAINING:
-   python train_password.py
-   
-3. RESULT:
-   Creates password_keystroke_model.pkl
-
-REQUIREMENTS:
-- All 5 CSV files must exist in same directory
-- Each file = 1 complete password attempt
-- Same password typed 5 times
-- Similar length across all attempts (for best results)
-
-TIPS:
-- Type naturally, not too carefully
-- Use same keyboard/device
-- Don't rush or go too slow
-- If you made errors, redo that attempt
-"""
