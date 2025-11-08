@@ -1,143 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+    <title>Keystroke Recorder</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MFA Biometric System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <div class="logo">
-                <h1>🔐 MFA Biometric System</h1>
-            </div>
-            <div class="nav-links">
-                <a href="/register">Register</a>
-                <a href="/login">Login</a>
-            </div>
-        </div>
-    </nav>
+    <h1>Keystroke Recorder</h1>
+    <p>Enter password below:</p>
 
-    <main class="container">
-        <div class="hero">
-            <h1>Multi-Factor Authentication</h1>
-            <h2>Keystroke Dynamics & Face Recognition</h2>
-            <p>Secure your accounts with advanced biometric authentication</p>
-            <div class="hero-buttons">
-                <a href="/register" class="btn btn-primary">Get Started</a>
-                <a href="/login" class="btn btn-secondary">Login</a>
-            </div>
-        </div>
+    <label for="passwordInput">Password:</label>
+    <input type="text" id="passwordInput" placeholder="Enter password" />
+    <br><br>
 
-        <div class="features">
-            <h2>Features</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">⌨️</div>
-                    <h3>Keystroke Dynamics</h3>
-                    <p>Unique typing pattern recognition using advanced algorithms</p>
-                    <ul>
-                        <li>Dwell Time Analysis</li>
-                        <li>Flight Time Measurement</li>
-                        <li>Typing Speed & Rhythm</li>
-                        <li>Pattern Entropy Calculation</li>
-                    </ul>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">👤</div>
-                    <h3>Face Recognition</h3>
-                    <p>DeepFace technology with VGGFace2 embeddings</p>
-                    <ul>
-                        <li>VGGFace2 Deep Learning</li>
-                        <li>Face Quality Assessment</li>
-                        <li>Embedding Comparison</li>
-                        <li>Liveness Detection</li>
-                    </ul>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🤖</div>
-                    <h3>ML Algorithms</h3>
-                    <p>Multiple machine learning models for accuracy</p>
-                    <ul>
-                        <li>Neural Networks (MLP)</li>
-                        <li>Random Forest Ensemble</li>
-                        <li>Support Vector Machines</li>
-                        <li>k-Nearest Neighbors</li>
-                    </ul>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">📏</div>
-                    <h3>Distance Metrics</h3>
-                    <p>Advanced mathematical distance calculations</p>
-                    <ul>
-                        <li>Euclidean Distance</li>
-                        <li>Mahalanobis Distance</li>
-                        <li>Cosine Distance</li>
-                        <li>Manhattan Distance</li>
-                    </ul>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">⚙️</div>
-                    <h3>Feature Optimization</h3>
-                    <p>Smart feature engineering techniques</p>
-                    <ul>
-                        <li>PCA Dimensionality</li>
-                        <li>Feature Normalization</li>
-                        <li>Statistical Analysis</li>
-                        <li>Feature Selection</li>
-                    </ul>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🔒</div>
-                    <h3>Security</h3>
-                    <p>Enterprise-grade security features</p>
-                    <ul>
-                        <li>JWT Authentication</li>
-                        <li>Password Hashing</li>
-                        <li>Session Management</li>
-                        <li>Audit Logging</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <div class="how-it-works">
-            <h2>How It Works</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-number">1</div>
-                    <h3>Register</h3>
-                    <p>Create your account with username and password</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">2</div>
-                    <h3>Enroll Keystroke</h3>
-                    <p>Type reference text 5 times for keystroke profile</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <h3>Enroll Face</h3>
-                    <p>Capture your face 3 times from different angles</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">4</div>
-                    <h3>Authenticate</h3>
-                    <p>Use both methods for secure multi-factor authentication</p>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <footer class="footer">
-        <p>&copy; 2024 MFA Biometric System. All rights reserved.</p>
-    </footer>
-
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <button onclick="sendData()">Submit Data</button>
+    <script src="{{url_for('static', filename='js/script.js')}}"></script>
 </body>
 </html>
