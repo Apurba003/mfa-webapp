@@ -56,7 +56,7 @@ for i, csv_file in enumerate(csv_files, 1):
     features = extract_features_from_attempt(df)
     features_list.append(features)
 
-print("="*50)
+
 print(f"Total attempts loaded: {len(attempts)}")
 
 
@@ -69,7 +69,7 @@ print(f"  Lengths: {lengths}")
 print(f"  Average: {avg_length:.1f} keystrokes")
 
 if max_diff > 3:
-    print(f"  ⚠ WARNING: Length variation is {max_diff} keystrokes")
+    print(f"  WARNING: Length variation is {max_diff} keystrokes")
     print(f"  This might indicate different passwords or typing errors!")
 else:
     print(f"  ✓ Length consistency: Good (±{max_diff} keystrokes)")
@@ -80,12 +80,12 @@ print(f"\nGenerated {len(X)} training samples (one per CSV)")
 print(f"Features per sample: {X.shape[1]}")
 
 
-print("\nScaling features...")
+
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
 
-print("Training Isolation Forest model...")
+
 model = IsolationForest(
     contamination=0.2, 
     random_state=42,
@@ -106,13 +106,8 @@ model_data = {
 with open('Model/password_keystroke_model.pkl', 'wb') as f:
     pickle.dump(model_data, f)
 
-print("✓ Training completed!")
-print("✓ Model saved to 'password_keystroke_model.pkl'")
 
 
-
-
-print("\nTiming Statistics Across All 5 Attempts:")
 feature_df = pd.DataFrame(features_list)
 stats_df = feature_df[['dwell_mean', 'dwell_std', 'flight_mean', 'flight_std']].describe()
 print(stats_df.round(2))
