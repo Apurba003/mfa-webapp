@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import pickle
 
-def extract_features_from_attempt(df):
+def extract_features(df):
 
     dwell = df['dwell_time'].dropna()
     flight = df['flight_time'].dropna()
@@ -27,7 +27,7 @@ def extract_features_from_attempt(df):
     return features
 
 
-print("Loading trained model...")
+
 with open('Model/password_keystroke_model.pkl', 'rb') as f:
     model_data = pickle.load(f)
 
@@ -35,11 +35,11 @@ model = model_data['model']
 scaler = model_data['scaler']
 expected_length = model_data['password_length']
 
-print("✓ Model loaded successfully")
-print(f"Expected password length: {expected_length} keystrokes")
+print("Model loaded successfully")
 
 
-print("\nLoading verification data...")
+
+
 df = pd.read_csv('data/sample6.csv')
 df.columns = df.columns.str.strip().str.lower()
 
@@ -47,11 +47,11 @@ print(f"Loaded {len(df)} keystrokes for verification")
 
 
 if abs(len(df) - expected_length) > 2: 
-    print(f"⚠ WARNING: Expected ~{expected_length} keystrokes, got {len(df)}")
+    print(f"WARNING: Expected {expected_length} keystrokes, got {len(df)}")
     print("This might be a different password!")
 
 
-features = extract_features_from_attempt(df)
+features = extract_features(df)
 X = pd.DataFrame([features]).values
 
 
@@ -70,21 +70,17 @@ confidence = max(0, min(100, confidence))
 
 
 if is_authentic:
-    print("✓ AUTHENTICATION SUCCESSFUL")
-    print("Status: VERIFIED ✓")
+    print("AUTHENTICATION SUCCESSFUL")
+    print("Status: VERIFIED ")
     print(f"Confidence: {confidence}%")
     print(f"Decision Score: {score:.4f}")
     print("\n➜ This typing pattern matches the enrolled user!")
 else:
-    print("✗ AUTHENTICATION FAILED")
-    print("Status: REJECTED ✗")
+    print("AUTHENTICATION FAILED")
+    print("Status: REJECTED ")
     print(f"Confidence: {confidence}%")
     print(f"Decision Score: {score:.4f}")
-    print("\n➜ This typing pattern does NOT match the enrolled user!")
-    print("   Possible reasons:")
-    print("   - Different person typing")
-    print("   - Typing too fast/slow")
-    print("   - Typing errors or corrections")
+
 
 
 
