@@ -1,18 +1,17 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Keystroke Recorder</title>
     <meta charset="UTF-8">
 </head>
+
 <body>
     <h1>Keystroke Recorder</h1>
-    <p>Enter password below:</p>
-
-    <label for="passwordInput">Password:</label>
-    <input type="text" id="passwordInput" placeholder="Enter password" />
-    <br><br>
-
+        <textarea id="passwordInput" cols="80" rows="20"></textarea>
+        <br>
     <button onclick="sendData()">Submit Data</button>
     <script src="{{url_for('static', filename='js/script.js')}}"></script>
 </body>
+
 </html>

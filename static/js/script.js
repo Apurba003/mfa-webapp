@@ -71,4 +71,5 @@ function sendData() {
             console.error("Error:", error);
             alert("Failed to send data.");
         });
+    location.reload()
 }
